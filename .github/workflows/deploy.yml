@@ -13,6 +13,10 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+env:
+  VITE_SUPABASE_URL: https://viwqlxtndngwbrjddnpc.supabase.co
+  VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -27,6 +31,8 @@ jobs:
         run: npm install
       - name: Build
         run: npm run build
+      - name: SPA fallback
+        run: cp dist/index.html dist/404.html
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
