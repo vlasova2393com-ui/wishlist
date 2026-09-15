@@ -29,6 +29,8 @@ jobs:
           node-version: 22
       - name: Install
         run: npm install
+      - name: Verify Supabase key is available
+        run: test -n "$VITE_SUPABASE_PUBLISHABLE_KEY"
       - name: Build
         run: npm run build
       - name: SPA fallback
