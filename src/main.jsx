@@ -13,8 +13,8 @@ const DEMO_CATEGORIES = { julia: ['Хочу', 'Подарки', 'Для дома
 const PROFILE_IDS = { julia: '033173b8-7ccb-4333-920c-d1cee29b071a', sergey: '0b1cd22c-21b3-4848-a3b4-8bad8f868c86' }
 
 function App() {
-  const [selected, setSelected] = useState(() => location.pathname.endsWith('/julia') ? LISTS[0] : null)
-  const open = (list) => { setSelected(list); if (list.id === 'julia') history.pushState({}, '', `${import.meta.env.BASE_URL}julia`) }
+  const [selected, setSelected] = useState(() => { const id = location.pathname.match(/\/(julia|sergey|shared)\/?$/)?.[1]; return LISTS.find(x => x.id === id) || null })
+  const open = (list) => { setSelected(list); history.pushState({}, '', `${import.meta.env.BASE_URL}${list.id}`) }
   const home = () => { setSelected(null); history.pushState({}, '', import.meta.env.BASE_URL) }
   if (selected) return <WishlistScreen list={selected} onBack={home} />
   return <main className="page home-page"><div className="ambient ambient-one" /><div className="ambient ambient-two" />
@@ -62,8 +62,8 @@ function WishlistScreen({ list, onBack }) {
   const addCategory = async () => { const name = categoryName.trim(); if (!name) return; const { error: e } = await supabase.from('categories').insert({ wishlist_id: data.id, name, position: categories.length }); if (e) setError(e.message); else { setCategoryName(''); setNewCategory(false); load() } }
   const logout = async () => { await supabase.auth.signOut(); setProfile(null); setSession(null); load() }
 
-  return <main className="page wishlist-page"><div className="ambient ambient-one" /><button className="back" onClick={onBack}>← Все списки</button>
-    <section className="hero compact"><div><p className="eyebrow">Список желаний</p><h1>{data?.name || `${list.name} ${list.person || ''}`}</h1><p className="subtitle">{data?.description || list.description}</p></div><div className="hero-actions">{session ? <button className="secondary" onClick={logout}><LogOut size={16} /> Выйти</button> : <button className="primary" onClick={() => setAuthOpen(true)}><LogIn size={17} /> Войти</button>}{canEdit && <button className="primary" onClick={() => addWish(categories[0])}><Plus size={18} /> Добавить</button>}</div></section>
+  return <main className="page wishlist-page"><div className="ambient ambient-one" />{!publicList && <button className="back" onClick={onBack}>← Все списки</button>}
+    <section className="hero compact"><div><p className="eyebrow">Список желаний</p><h1>{data?.name || `${list.name} ${list.person || ''}`}</h1><p className="subtitle">{data?.description || list.description}</p></div><div className="hero-actions">{!publicList && (session ? <button className="secondary" onClick={logout}><LogOut size={16} /> Выйти</button> : <button className="primary" onClick={() => setAuthOpen(true)}><LogIn size={17} /> Войти</button>)}{canEdit && <button className="primary" onClick={() => addWish(categories[0])}><Plus size={18} /> Добавить</button>}</div></section>
     {!publicList && session && !profile && <div className="setup-box"><strong>Настрой доступ</strong><span>Выбери свой профиль один раз.</span><button className="primary" onClick={() => setClaimOpen(true)}>Выбрать профиль</button></div>}
     {loading ? <div className="loading"><LoaderCircle size={22} className="spin" /> Загружаю желания…</div> : error ? <div className="error-box">Не удалось загрузить вишлист.<br /><small>{error}</small></div> : <div className="categories">{categories.map((c, i) => <CategoryCard key={c.id || c.name} category={c} index={i} publicList={publicList} canEdit={canEdit} onAdd={() => addWish(c)} onEdit={setEditor} onDelete={deleteWish} />)}</div>}
     {!publicList && canEdit && (newCategory ? <div className="add-category"><input autoFocus value={categoryName} onChange={e => setCategoryName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCategory()} placeholder="Название рубрики" /><button className="primary" onClick={addCategory}>Добавить</button><button className="cancel" onClick={() => setNewCategory(false)}>Отмена</button></div> : <button className="add-category-trigger" onClick={() => setNewCategory(true)}><Plus size={17} /> Добавить рубрику</button>)}
@@ -94,7 +94,7 @@ function WishModal({ wish, wishlistId, profileId, categories, close, saved }) {
 
 function AuthModal({ close }) {
   const [email, setEmail] = useState(''), [sent, setSent] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('')
-  const submit = async e => { e.preventDefault(); setBusy(true); const { error: e2 } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: location.href } }); if (e2) setError(e2.message); else setSent(true); setBusy(false) }
+  const submit = async e => { e.preventDefault(); setBusy(true); const { error: e2 } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: `${location.origin}${location.pathname.replace(/\/$/, '') || import.meta.env.BASE_URL}` } }); if (e2) setError(e2.message); else setSent(true); setBusy(false) }
   return <div className="modal-backdrop"><form className="modal small-modal" onSubmit={submit}><div className="modal-head"><div><p className="eyebrow">Доступ владельца</p><h2>Войти</h2></div><button type="button" className="close-button" onClick={close}><X size={18} /></button></div>{sent ? <div className="success-note">Письмо отправлено на <strong>{email}</strong>.<br />Открой ссылку из письма.</div> : <><p className="modal-text">Вход нужен для добавления и редактирования желаний.</p><label>Email<input required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" /></label>{error && <div className="form-error">{error}</div>}<div className="modal-actions"><button type="button" className="cancel" onClick={close}>Отмена</button><button className="primary" disabled={busy}>{busy ? 'Отправляю…' : 'Получить ссылку'}</button></div></>}</form></div>
 }
 
