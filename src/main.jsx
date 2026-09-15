@@ -36,6 +36,7 @@ function WishlistScreen({ list, onBack }) {
     if (publicList) {
       const { data: result, error: e } = await supabase.rpc('get_public_wishlist', { p_slug: 'julia' })
       if (e) setError(e.message); else setData(result)
+      const { data: auth } = await supabase.auth.getSession(); setSession(auth.session)
       setLoading(false); return
     }
     const { data: auth } = await supabase.auth.getSession(); const current = auth.session
@@ -54,7 +55,7 @@ function WishlistScreen({ list, onBack }) {
     setLoading(false)
   }
 
-  useEffect(() => { load(); if (!publicList) { const { data: sub } = supabase.auth.onAuthStateChange(() => load()); return () => sub.subscription.unsubscribe() } }, [list.id])
+  useEffect(() => { load(); const { data: sub } = supabase.auth.onAuthStateChange(() => load()); return () => sub.subscription.unsubscribe() }, [list.id])
   const categories = data?.categories || [], canEdit = !publicList && !!profile
   const addWish = category => setEditor({ category_id: category?.id || categories[0]?.id, priority: 'medium', currency: 'RUB', status: 'active' })
   const deleteWish = async wish => { if (!confirm(`Удалить «${wish.title}»?`)) return; const { error: e } = await supabase.from('wishes').update({ status: 'archived' }).eq('id', wish.id); if (e) setError(e.message); else load() }
@@ -62,7 +63,7 @@ function WishlistScreen({ list, onBack }) {
   const logout = async () => { await supabase.auth.signOut(); setProfile(null); setSession(null); load() }
 
   return <main className="page wishlist-page"><div className="ambient ambient-one" /><button className="back" onClick={onBack}>← Все списки</button>
-    <section className="hero compact"><div><p className="eyebrow">Список желаний</p><h1>{data?.name || `${list.name} ${list.person || ''}`}</h1><p className="subtitle">{data?.description || list.description}</p></div>{!publicList && <div className="hero-actions">{session ? <button className="secondary" onClick={logout}><LogOut size={16} /> Выйти</button> : <button className="primary" onClick={() => setAuthOpen(true)}><LogIn size={17} /> Войти</button>}{canEdit && <button className="primary" onClick={() => addWish(categories[0])}><Plus size={18} /> Добавить</button>}</div>}</section>
+    <section className="hero compact"><div><p className="eyebrow">Список желаний</p><h1>{data?.name || `${list.name} ${list.person || ''}`}</h1><p className="subtitle">{data?.description || list.description}</p></div><div className="hero-actions">{session ? <button className="secondary" onClick={logout}><LogOut size={16} /> Выйти</button> : <button className="primary" onClick={() => setAuthOpen(true)}><LogIn size={17} /> Войти</button>}{canEdit && <button className="primary" onClick={() => addWish(categories[0])}><Plus size={18} /> Добавить</button>}</div></section>
     {!publicList && session && !profile && <div className="setup-box"><strong>Настрой доступ</strong><span>Выбери свой профиль один раз.</span><button className="primary" onClick={() => setClaimOpen(true)}>Выбрать профиль</button></div>}
     {loading ? <div className="loading"><LoaderCircle size={22} className="spin" /> Загружаю желания…</div> : error ? <div className="error-box">Не удалось загрузить вишлист.<br /><small>{error}</small></div> : <div className="categories">{categories.map((c, i) => <CategoryCard key={c.id || c.name} category={c} index={i} publicList={publicList} canEdit={canEdit} onAdd={() => addWish(c)} onEdit={setEditor} onDelete={deleteWish} />)}</div>}
     {!publicList && canEdit && (newCategory ? <div className="add-category"><input autoFocus value={categoryName} onChange={e => setCategoryName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCategory()} placeholder="Название рубрики" /><button className="primary" onClick={addCategory}>Добавить</button><button className="cancel" onClick={() => setNewCategory(false)}>Отмена</button></div> : <button className="add-category-trigger" onClick={() => setNewCategory(true)}><Plus size={17} /> Добавить рубрику</button>)}
