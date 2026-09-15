@@ -1,0 +1,56 @@
+name: Patch wishlist routes
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, 'chore: patch wishlist routes') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch routes and guest UI
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/main.jsx')
+          s = p.read_text()
+          old = "const [selected, setSelected] = useState(() => location.pathname.endsWith('/julia') ? LISTS[0] : null)"
+          new = "const [selected, setSelected] = useState(() => { const id = location.pathname.match(/\\/(julia|sergey|shared)\\/?$/)?.[1]; return LISTS.find(x => x.id === id) || null })"
+          if old not in s:
+              raise SystemExit('route init pattern not found')
+          s = s.replace(old, new)
+          old = "const open = (list) => { setSelected(list); if (list.id === 'julia') history.pushState({}, '', `${import.meta.env.BASE_URL}julia`) }"
+          new = "const open = (list) => { setSelected(list); history.pushState({}, '', `${import.meta.env.BASE_URL}${list.id}`) }"
+          if old not in s:
+              raise SystemExit('route open pattern not found')
+          s = s.replace(old, new)
+          old = "<button className=\"back\" onClick={onBack}>← Все списки</button>"
+          new = "{!publicList && <button className=\"back\" onClick={onBack}>← Все списки</button>}"
+          if old not in s:
+              raise SystemExit('back button pattern not found')
+          s = s.replace(old, new)
+          old = "<div className=\"hero-actions\">{session ? <button className=\"secondary\" onClick={logout}><LogOut size={16} /> Выйти</button> : <button className=\"primary\" onClick={() => setAuthOpen(true)}><LogIn size={17} /> Войти</button>}{canEdit && <button className=\"primary\" onClick={() => addWish(categories[0])}><Plus size={18} /> Добавить</button>}</div>"
+          new = "<div className=\"hero-actions\">{!publicList && (session ? <button className=\"secondary\" onClick={logout}><LogOut size={16} /> Выйти</button> : <button className=\"primary\" onClick={() => setAuthOpen(true)}><LogIn size={17} /> Войти</button>)}{canEdit && <button className=\"primary\" onClick={() => addWish(categories[0])}><Plus size={18} /> Добавить</button>}</div>"
+          if old not in s:
+              raise SystemExit('hero actions pattern not found')
+          s = s.replace(old, new)
+          old = "emailRedirectTo: location.href"
+          new = "emailRedirectTo: `${location.origin}${location.pathname.replace(/\\/$/, '') || import.meta.env.BASE_URL}`"
+          if old not in s:
+              raise SystemExit('redirect pattern not found')
+          s = s.replace(old, new)
+          p.write_text(s)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/main.jsx
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: patch wishlist routes"
+          git push
